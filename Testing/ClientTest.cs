@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System.Collections.Generic;
+using NUnit.Framework;
 using Authy.Net;
 using System;
 
@@ -147,10 +148,298 @@ namespace Testing {
 		[Test]
 		public void Start_OneTouch()
 		{
+			var details = new Dictionary<string, string>();
+			details.Add("username", "Gabriel Garcia Marquez");
+			details.Add("location", "Colombia");
+			var hidden_details = new Dictionary<string, string>();
+			hidden_details.Add("ip_address", "192.168.1.1");
+			var logos = new List<Dictionary<string, string>>();
+			logos.Add(new Dictionary<string, string> { { "res", "default" }, { "url", "https://www.microsoft.com/net/images/VS-checkmark.png" } });
+			logos.Add(new Dictionary<string, string> { { "res", "med" }, { "url", "https://www.microsoft.com/net/images/VS-checkmark.png" } });
+			ApprobalRequestParams appr = new OneTouchBuilder()
+				.Begin()
+				.ApiKey(validApiKey)
+				.Message("Login requested by X")
+				.SecondsToExpire("86400")
+				.Details(details)
+				.HiddenDetails(hidden_details)
+				.Logos(logos)
+				.Build();
+;
 			var client = this.ValidAuthyClient;
-			var result = client.OneTouch("30144611");
+			//var result = client.OneTouch("30144611", "Login requested by X", details, hidden_details, logos);
+			var result = client.OneTouch("30144611", appr);
 			Assert.AreEqual(result.Success, true);
 			Assert.IsNotNull(result.Approval_Request["uuid"]);
+		}
+
+		[Test]
+		public void Check_ApprovalStatus()
+		{
+			var client = this.ValidAuthyClient;
+			ApprobalRequestParams appr = new OneTouchBuilder()
+				.Begin()
+				.ApiKey(validApiKey)
+				.Message("Login requested by X")
+				.Build();
+			
+			var result = client.OneTouch("30144611", appr);
+			var uuid = result.Approval_Request["uuid"];
+			var resultStatus = client.GetApprovalStatus(uuid);
+			Assert.AreEqual(resultStatus.Success, true);
+		}
+
+		[Test]
+		public void Message_Requiere()
+		{
+			var details = new Dictionary<string, string>();
+			details.Add("username", "Gabriel Garcia Marquez");
+			details.Add("location", "Colombia");
+			var hidden_details = new Dictionary<string, string>();
+			hidden_details.Add("ip_address", "192.168.1.1");
+			var client = this.ValidAuthyClient;
+			try
+			{
+				ApprobalRequestParams appr = new OneTouchBuilder()
+					.Begin()
+					.ApiKey(validApiKey)
+					.Details(details)
+					.HiddenDetails(hidden_details)
+					.Build()
+	;
+				var result = client.OneTouch("30144611", appr);
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.MESSAGE_ERROR);
+			}
+			catch (OneTouchBuilderException ex) { 
+				OneTouchResult result = new OneTouchResult();
+				result.Message = ex.Message;
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.MESSAGE_ERROR);
+			}
+		}
+
+		[Test]
+		public void Invalid_Logos_Keys()
+		{
+			var details = new Dictionary<string, string>();
+			details.Add("username", "Gabriel Garcia Marquez");
+			details.Add("location", "Colombia");
+			var hidden_details = new Dictionary<string, string>();
+			hidden_details.Add("ip_address", "192.168.1.1");
+			var logos = new List<Dictionary<string, string>>();
+			logos.Add(new Dictionary<string, string> { { "res", "default" }, { "url", "https://www.microsoft.com/net/images/VS-checkmark.png" } });
+			logos.Add(new Dictionary<string, string> { { "res", "med" }, { "wrong", "med" }, { "url", "https://www.microsoft.com/net/images/VS-checkmark.png" } });
+			logos.Add(new Dictionary<string, string> { { "res", "low" }, { "url", "https://www.microsoft.com/net/images/VS-checkmark.png" } });
+			var client = this.ValidAuthyClient;
+			try
+			{
+				ApprobalRequestParams appr = new OneTouchBuilder()
+					.Begin()
+					.ApiKey(validApiKey)
+					.Message("Login requested by X")
+					.SecondsToExpire("86400")
+					.Details(details)
+					.HiddenDetails(hidden_details)
+					.Logos(logos)
+					.Build();
+
+				var result = client.OneTouch("30144611", appr);
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.LOGO_ERROR_KEYS);
+				Assert.IsNull(result.Approval_Request);
+
+			}
+			catch (OneTouchBuilderException ex)
+			{
+				OneTouchResult result = new OneTouchResult();
+				result.Message = ex.Message;
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.LOGO_ERROR_KEYS);
+				Assert.IsNull(result.Approval_Request);
+			}
+		}
+
+		[Test]
+		public void No_Default_Value()
+		{
+			var details = new Dictionary<string, string>();
+			details.Add("username", "Gabriel Garcia Marquez");
+			details.Add("location", "Colombia");
+			var hidden_details = new Dictionary<string, string>();
+			hidden_details.Add("ip_address", "192.168.1.1");
+			var logos = new List<Dictionary<string, string>>();
+			logos.Add(new Dictionary<string, string> { { "res", "low" }, { "url", "https://www.microsoft.com/net/images/VS-checkmark.png" } });
+			var client = this.ValidAuthyClient;
+			try
+			{
+				ApprobalRequestParams appr = new OneTouchBuilder()
+					.Begin()
+					.ApiKey(validApiKey)
+					.Message("Login requested by X")
+					.SecondsToExpire("86400")
+					.Details(details)
+					.HiddenDetails(hidden_details)
+					.Logos(logos)
+					.Build();
+				var result = client.OneTouch("30144611", appr);
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.LOGO_ERROR_DEFAULT);
+				Assert.IsNull(result.Approval_Request);
+			}
+			catch (OneTouchBuilderException ex)
+			{
+				OneTouchResult result = new OneTouchResult();
+				result.Message = ex.Message;
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.LOGO_ERROR_DEFAULT);
+				Assert.IsNull(result.Approval_Request);
+			}
+		}
+
+		[Test]
+		public void No_Url_Key()
+		{
+			var details = new Dictionary<string, string>();
+			details.Add("username", "Gabriel Garcia Marquez");
+			details.Add("location", "Colombia");
+			var hidden_details = new Dictionary<string, string>();
+			hidden_details.Add("ip_address", "192.168.1.1");
+			var logos = new List<Dictionary<string, string>>();
+			logos.Add(new Dictionary<string, string> { { "res", "default" }});
+			var client = this.ValidAuthyClient;
+			try
+			{
+				ApprobalRequestParams appr = new OneTouchBuilder()
+					.Begin()
+					.ApiKey(validApiKey)
+					.Message("Login requested by X")
+					.SecondsToExpire("86400")
+					.Details(details)
+					.HiddenDetails(hidden_details)
+					.Logos(logos)
+					.Build();
+				var result = client.OneTouch("30144611", appr);
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.LOGO_ERROR_NO_KEYS);
+				Assert.IsNull(result.Approval_Request);
+			}
+			catch (OneTouchBuilderException ex) { 
+				OneTouchResult result = new OneTouchResult();
+				result.Message = ex.Message;
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.LOGO_ERROR_NO_KEYS);
+				Assert.IsNull(result.Approval_Request);
+			}
+		}
+
+		[Test]
+		public void No_Res_Key()
+		{
+			var details = new Dictionary<string, string>();
+			details.Add("username", "Gabriel Garcia Marquez");
+			details.Add("location", "Colombia");
+			var hidden_details = new Dictionary<string, string>();
+			hidden_details.Add("ip_address", "192.168.1.1");
+			var logos = new List<Dictionary<string, string>>();
+			logos.Add(new Dictionary<string, string> { { "url", "https://www.microsoft.com/net/images/VS-checkmark.png" } });
+			var client = this.ValidAuthyClient;
+			try
+			{
+				ApprobalRequestParams appr = new OneTouchBuilder()
+					.Begin()
+					.ApiKey(validApiKey)
+					.Message("Login requested by X")
+					.SecondsToExpire("86400")
+					.Details(details)
+					.HiddenDetails(hidden_details)
+					.Logos(logos)
+					.Build();
+				var result = client.OneTouch("30144611", appr);
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.LOGO_ERROR_NO_KEYS);
+				Assert.IsNull(result.Approval_Request);
+			}
+			catch (OneTouchBuilderException ex)
+			{
+				OneTouchResult result = new OneTouchResult();
+				result.Message = ex.Message;
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.LOGO_ERROR_NO_KEYS);
+				Assert.IsNull(result.Approval_Request);
+			}
+		}
+
+		[Test]
+		public void Bad_Detail()
+		{
+			var details = new Dictionary<string, string>();
+			details.Add("", "");
+			details.Add("location", "Colombia");
+			var hidden_details = new Dictionary<string, string>();
+			hidden_details.Add("ip_address", "192.168.1.1");
+			var logos = new List<Dictionary<string, string>>();
+			logos.Add(new Dictionary<string, string> {{ "res", "default" }, { "url", "https://www.microsoft.com/net/images/VS-checkmark.png" } });
+			var client = this.ValidAuthyClient;
+			try
+			{
+				ApprobalRequestParams appr = new OneTouchBuilder()
+					.Begin()
+					.ApiKey(validApiKey)
+					.Message("Login requested by X")
+					.SecondsToExpire("86400")
+					.Details(details)
+					.HiddenDetails(hidden_details)
+					.Logos(logos)
+					.Build();
+				var result = client.OneTouch("30144611", appr);
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.DETAIL_ERROR);
+				Assert.IsNull(result.Approval_Request);
+			}
+			catch (OneTouchBuilderException ex) {
+				OneTouchResult result = new OneTouchResult();
+				result.Message = ex.Message;
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.DETAIL_ERROR);
+				Assert.IsNull(result.Approval_Request);
+			}
+		}
+
+		[Test]
+		public void Bad_Hidden_Detail()
+		{
+			var details = new Dictionary<string, string>();
+			details.Add("username", "Gabriel Garcia Marquez");
+			details.Add("location", "Colombia");
+			var hidden_details = new Dictionary<string, string>();
+			hidden_details.Add("", "");
+			var logos = new List<Dictionary<string, string>>();
+			logos.Add(new Dictionary<string, string> { { "res", "default" }, { "url", "https://www.microsoft.com/net/images/VS-checkmark.png" } });
+			var client = this.ValidAuthyClient;
+			try
+			{
+				ApprobalRequestParams appr = new OneTouchBuilder()
+					.Begin()
+					.ApiKey(validApiKey)
+					.Message("Login requested by X")
+					.SecondsToExpire("86400")
+					.Details(details)
+					.HiddenDetails(hidden_details)
+					.Logos(logos)
+					.Build();
+				var result = client.OneTouch("30144611", appr);
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.HIDDEN_DETAIL_ERROR);
+				Assert.IsNull(result.Approval_Request);
+			}
+			catch (OneTouchBuilderException ex) { 
+				OneTouchResult result = new OneTouchResult();
+				result.Message = ex.Message;
+				Assert.AreEqual(result.Success, false);
+				Assert.AreEqual(result.Message, OneTouchBuilder.HIDDEN_DETAIL_ERROR);
+				Assert.IsNull(result.Approval_Request);
+			}
 		}
     }
 }
